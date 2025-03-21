@@ -1,0 +1,220 @@
+1. sms_bot.py – Mã nguồn bot Telegram hoàn chỉnh
+
+
+# sms_bot.py
+import os
+import time
+from datetime import datetime, timedelta
+from telegram import Update, ReplyKeyboardMarkup, Bot
+from telegram.ext import (
+    ApplicationBuilder, CommandHandler,
+    MessageHandler, filters, ContextTypes,
+    ConversationHandler
+)
+from apscheduler.schedulers.background import BackgroundScheduler
+
+# ====== CẤU HÌNH ======
+TELEGRAM_TOKEN = "YOUR_BOT_TOKEN"  # <-- thay token bot của bạn
+ALLOWED_USERS = [123456789]        # <-- thay bằng Telegram user ID bạn
+
+VIDEO_PATH = "/sdcard/sms_video.mp4"
+LOG_PATH = "/sdcard/sms_log.txt"
+
+MESSAGES = {
+    "1": ("900", "VINACARD"),
+    "2": ("900", "VINAXTRA")
+}
+
+SELECT_MSG = range(1)
+scheduler = BackgroundScheduler()
+scheduler.start()
+
+# ====== HÀM ======
+
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id not in ALLOWED_USERS:
+        await update.message.reply_text("Bạn không có quyền dùng bot này.")
+        return ConversationHandler.END
+
+    buttons = [["1"], ["2"]]
+    await update.message.reply_text(
+        "Chọn gói muốn gửi:\n1 = VINACARD\n2 = VINAXTRA",
+        reply_markup=ReplyKeyboardMarkup(buttons, one_time_keyboard=True)
+    )
+    return SELECT_MSG
+
+
+async def select_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    key = update.message.text.strip()
+    if key not in MESSAGES:
+        await update.message.reply_text("Sai mẫu. Hãy chọn 1 hoặc 2.")
+        return SELECT_MSG
+
+    phone, content = MESSAGES[key]
+    timestamp = int(time.time())
+    trigger_file = f"/sdcard/start_record_sms_{timestamp}.txt"
+
+    os.system(f'termux-sms-send -n {phone} "{content}"')
+    os.system("input keyevent 224")  # Bật màn hình
+    os.system("am start -n com.google.android.apps.messaging/.ui.ConversationListActivity")
+    time.sleep(1)
+    os.system(f"touch {trigger_file}")
+
+    now = datetime.now()
+    formatted_time = now.strftime("%H:%M:%S - %d/%m/%Y")
+    with open(LOG_PATH, "a") as f:
+        f.write(f"{formatted_time} | {phone} | {content}\n")
+
+    await update.message.reply_text(f"Đã gửi '{content}' đến {phone} lúc {formatted_time}")
+
+    time.sleep(10)
+    bot = Bot(token=TELEGRAM_TOKEN)
+    chat_id = update.message.chat_id
+
+    if os.path.exists(VIDEO_PATH):
+        with open(VIDEO_PATH, "rb") as vid:
+            bot.send_video(chat_id=chat_id, video=vid, caption=f"Gửi lúc: {formatted_time}")
+    else:
+        bot.send_message(chat_id=chat_id, text="Không tìm thấy video.")
+
+    return ConversationHandler.END
+
+
+async def history(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat_id = update.message.chat_id
+    if os.path.exists(LOG_PATH):
+        with open(LOG_PATH, "rb") as f:
+            await context.bot.send_document(chat_id=chat_id, document=f, filename="sms_log.txt")
+    else:
+        await update.message.reply_text("Chưa có log nào.")
+
+
+async def schedule_sms(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    try:
+        args = context.args
+        if len(args) != 2:
+            await update.message.reply_text("Cú pháp: /schedule VINACARD 08:00")
+            return
+
+        msg_type = args[0].upper()
+        send_time = args[1]
+        phone = "900"
+
+        if msg_type not in ["VINACARD", "VINAXTRA"]:
+            await update.message.reply_text("Chỉ chấp nhận VINACARD hoặc VINAXTRA")
+            return
+
+        hour, minute = map(int, send_time.split(":"))
+        now = datetime.now()
+        scheduled = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
+        if scheduled < now:
+            scheduled += timedelta(days=1)
+
+        def job():
+            os.system(f'termux-sms-send -n {phone} "{msg_type}"')
+            log_time = datetime.now().strftime("%H:%M:%S - %d/%m/%Y")
+            with open(LOG_PATH, "a") as f:
+                f.write(f"{log_time} | {phone} | {msg_type} (Scheduled)\n")
+
+        scheduler.add_job(job, 'date', run_date=scheduled)
+        await update.message.reply_text(f"Đã hẹn gửi {msg_type} lúc {scheduled.strftime('%H:%M:%S - %d/%m/%Y')}")
+
+    except Exception as e:
+        await update.message.reply_text(f"Lỗi: {str(e)}")
+
+# ====== KHỞI CHẠY BOT ======
+
+app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
+
+conv_handler = ConversationHandler(
+    entry_points=[CommandHandler("start", start)],
+    states={SELECT_MSG: [MessageHandler(filters.TEXT & ~filters.COMMAND, select_message)]},
+    fallbacks=[]
+)
+
+app.add_handler(conv_handler)
+app.add_handler(CommandHandler("history", history))
+app.add_handler(CommandHandler("schedule", schedule_sms))
+app.run_polling()
+
+2. run_sms_bot.sh – Script chạy nền trong Termux
+
+#!/data/data/com.termux/files/usr/bin/bash
+
+cd /data/data/com.termux/files/home/sms_bot/
+nohup python sms_bot.py > bot_log.txt 2>&1 &
+echo "Bot đã chạy ngầm!"
+
+
+Sau khi tạo file này, chạy lệnh sau:
+
+chmod +x run_sms_bot.sh
+./run_sms_bot.sh
+
+
+3. Auto_SMS_Receive_And_Record.xml – File Tasker
+
+
+<TaskerData sr="" dvi="1" tv="5.15.4">
+  <Profile sr="p1" ve="2">
+    <c0>Event</c0>
+    <Event sr="e1" ve="2">
+      <FileObserver>
+        <Dir>/sdcard</Dir>
+        <File>start_record_sms_*</File>
+        <EventType>Created</EventType>
+      </FileObserver>
+    </Event>
+    <Task sr="t1">
+      <Action sr="a1" ve="7">
+        <Plugin>
+          <Component>com.az.screenrecorder/com.az.screenrecorder.MainActivity</Component>
+          <Extra/>
+        </Plugin>
+      </Action>
+      <Action sr="a2">
+        <Code>Wait</Code>
+        <Int>10000</Int>
+      </Action>
+      <Action sr="a3">
+        <Command>rm /sdcard/start_record_sms_*</Command>
+        <Code>Run Shell</Code>
+      </Action>
+    </Task>
+  </Profile>
+</TaskerData>
+
+
+
+
+
+
+File này import trong Tasker: Profile → Import → chọn file .xml
+
+
+4. README.txt – Hướng dẫn chi tiết
+
+# Hướng dẫn cài đặt SMS Bot trên Android (Termux)
+
+1. Cài Termux và Python
+   pkg update && pkg install python
+   pip install python-telegram-bot apscheduler
+
+2. Tạo thư mục ~/sms_bot/
+   Chép các file sau vào đó:
+   - sms_bot.py
+   - run_sms_bot.sh
+
+3. Cấp quyền lưu trữ & SMS cho Termux
+   termux-setup-storage
+   Vào Cài đặt > Ứng dụng > Termux > Quyền → Cho phép SMS
+
+4. Thay TELEGRAM_TOKEN và ALLOWED_USERS trong sms_bot.py
+
+5. Chạy bot:
+   chmod +x run_sms_bot.sh
+   ./run_sms_bot.sh
+
+6. Cài Tasker + AZ Recorder
+   Import file Auto_SMS_Receive_And_Record.xml
+   → Nó sẽ quay màn hình khi có trigger gửi SMS
