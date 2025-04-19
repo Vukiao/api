@@ -19,6 +19,18 @@ text_urls_all = [
     "http://36.50.134.20:3000/download/geonode",
     "http://36.50.134.20:3000/download/spysme",
     "http://36.50.134.20:3000/download/proxyscrape",
+    "https://raw.githubusercontent.com/hookzof/socks5_list/refs/heads/master/proxy.txt",
+"https://raw.githubusercontent.com/sunny9577/proxy-scraper/refs/heads/master/proxies.txt",
+"https://raw.githubusercontent.com/roosterkid/openproxylist/refs/heads/main/SOCKS5_RAW.txt",
+"https://raw.githubusercontent.com/roosterkid/openproxylist/refs/heads/main/HTTPS_RAW.txt",
+"https://raw.githubusercontent.com/roosterkid/openproxylist/refs/heads/main/SOCKS4_RAW.txt",
+"https://raw.githubusercontent.com/sunny9577/proxy-scraper/refs/heads/master/generated/http_proxies.txt",
+"https://raw.githubusercontent.com/sunny9577/proxy-scraper/refs/heads/master/generated/socks4_proxies.txt",
+"https://raw.githubusercontent.com/sunny9577/proxy-scraper/refs/heads/master/generated/socks5_proxies.txt",
+"https://raw.githubusercontent.com/ErcinDedeoglu/proxies/main/proxies/socks4.txt",
+"https://raw.githubusercontent.com/ErcinDedeoglu/proxies/main/proxies/socks5.txt",
+"https://raw.githubusercontent.com/ErcinDedeoglu/proxies/main/proxies/https.txt",
+"https://raw.githubusercontent.com/ErcinDedeoglu/proxies/main/proxies/http.txt",
     "http://36.50.134.20:3000/download/vn"
 ]
 
