@@ -3,10 +3,11 @@ import requests
 import random
 import threading
 import time
+import re
 
 app = Flask(__name__)
 
-# Cập nhật mỗi 5 phút (300 giây)
+# Cập nhật mỗi 60 giây
 UPDATE_INTERVAL = 60
 
 # Danh sách URL proxy
@@ -20,7 +21,7 @@ text_urls_all = [
     "http://36.50.134.20:3000/download/spysme",
     "http://36.50.134.20:3000/download/proxyscrape",
     "https://raw.githubusercontent.com/hookzof/socks5_list/refs/heads/master/proxy.txt",
-   "https://freeproxyupdate.com/files/txt/afghanistan.txt",
+    "https://freeproxyupdate.com/files/txt/afghanistan.txt",
     "https://freeproxyupdate.com/files/txt/albania.txt",
     "https://freeproxyupdate.com/files/txt/algeria.txt",
     "https://freeproxyupdate.com/files/txt/andorra.txt",
@@ -111,6 +112,10 @@ text_urls_vn = [
 proxy_cache_all = []
 proxy_cache_vn = []
 
+# Regex kiểm tra định dạng IP:Port
+def is_valid_proxy(line):
+    return re.match(r'^\d{1,3}(\.\d{1,3}){3}:\d{2,5}$', line)
+
 # Hàm tải proxy từ các URL text
 def fetch_text_proxies(urls):
     all_lines = set()
@@ -119,7 +124,10 @@ def fetch_text_proxies(urls):
             response = requests.get(url, timeout=10)
             response.raise_for_status()
             lines = response.text.strip().splitlines()
-            all_lines.update(line.strip() for line in lines if line.strip())
+            for line in lines:
+                line = line.strip()
+                if is_valid_proxy(line):
+                    all_lines.add(line)
         except Exception as e:
             print(f"[!] Lỗi khi tải {url}: {e}")
     return list(all_lines)
