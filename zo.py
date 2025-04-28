@@ -10,7 +10,7 @@ app = Flask(__name__)
 def run_z_script():
     try:
         # Chạy file z.py
-        subprocess.run(["python", "z.py"], check=True)
+        subprocess.run(["python3", "z.py"], check=True)
         print("File z.py đã được chạy thành công!")
     except subprocess.CalledProcessError as e:
         print(f"Error khi chạy file z.py: {e}")
@@ -36,13 +36,6 @@ def start_scheduler():
     scheduler.start()
 
 # Khởi chạy scheduler khi bắt đầu ứng dụng Flask
-@app.before_first_request
-def initialize():
-    start_scheduler()
-
-@app.route('/')
-def index():
-    return "Flask server is running and tasks are scheduled!"
-
 if __name__ == '__main__':
+    start_scheduler()  # Bắt đầu scheduler trước khi chạy Flask app
     app.run(debug=True, use_reloader=False)
