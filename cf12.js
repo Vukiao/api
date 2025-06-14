@@ -10,6 +10,263 @@ const crypto = require('crypto');
 const { exec } = require('child_process');
 const chalk = require('chalk');
 
+// Logic User-Agent mới
+// Danh sách thành phần cơ bản
+const platforms = [
+    'Windows NT 10.0; Win64; x64',
+    'Macintosh; Intel Mac OS X 10_15_7',
+    'X11; Linux x86_64',
+    'iPhone; CPU iPhone OS 15_0 like Mac OS X',
+];
+const renderers = [
+    'AppleWebKit/537.36 (KHTML, like Gecko)',
+    'Gecko/20100101',
+    'compatible; MSIE 10.0; Trident/6.0',
+];
+const browsers = [
+    'Chrome/{}.0.0.0 Safari/537.36',
+    'Firefox/{}.0',
+    'Version/{}.0 Mobile Safari/537.36',
+    'BotLike/{} (compatible; CustomAgent/1.0)',
+];
+const extensions = [
+    'Edge/{}.0',
+    'OPR/{}.0.0.0',
+    'UCBrowser/{}.0.0.0',
+];
+
+// Ký tự Unicode hợp lệ (thêm hiếm)
+const unicodeChars = [
+    '\u00A0', // Non-breaking space
+    '\u200B', // Zero-width space
+    '\u2013', // En dash
+    '\u2014', // Em dash
+    '\u202F', // Narrow no-break space
+    '\u00B7', // Middle dot
+    '\u00A9', // Copyright
+    '\u201C', // Left double quote
+    '\u00AE', // Registered sign
+    '\u00BB', // Right double guillemet
+    '\u00B1', // Plus-minus
+    '\u00A7', // Section sign
+    '\uFFFD', // Replacement character
+    '\u02DA', // Ring above
+];
+
+// Hàm tạo chuỗi ngẫu nhiên
+function randomString(length) {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    let result = '';
+    for (let i = 0; i < length; i++) {
+        result += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return result;
+}
+
+// Hàm tạo chuỗi giả Base64
+function fakeBase64(length) {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=';
+    let result = '';
+    for (let i = 0; i < length; i++) {
+        result += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return result;
+}
+
+// Hàm tạo chuỗi giả Hex (AES-like)
+function fakeHex(length) {
+    const chars = '0123456789abcdef';
+    let result = '';
+    for (let i = 0; i < length; i++) {
+        result += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return result;
+}
+
+// Hàm tạo pseudo-token (giả JWT)
+function fakeToken() {
+    const header = fakeBase64(20);
+    const payload = fakeBase64(30);
+    const signature = fakeBase64(15);
+    return `${header}.${payload}.${signature}`;
+}
+
+// Hàm tạo UUID v4-like
+function fakeUUID() {
+    const template = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx';
+    return template.replace(/[xy]/g, c => {
+        const r = Math.random() * 16 | 0;
+        const v = c === 'x' ? r : (r & 0x3 | 0x8);
+        return v.toString(16);
+    });
+}
+
+// Hàm thêm ký tự Unicode
+function addUnicodeNoise(str) {
+    let result = '';
+    for (let char of str) {
+        result += char;
+        if (Math.random() < 0.4) { // 40% xác suất
+            result += unicodeChars[Math.floor(Math.random() * unicodeChars.length)];
+        }
+    }
+    return result;
+}
+
+// Hàm hoán vị cú pháp (siêu ngẫu nhiên)
+function permuteSyntax(item) {
+    const parts = item.split('/');
+    const formats = [
+        item, // Module1/2.3
+        item.replace('/', ':'), // Module1:2.3
+        item.replace('/', '='), // Module1=2.3
+        item.replace('/', '~'), // Module1~2.3
+        `${parts[0]}_${parts[1]}_${randomString(5)}`, // Module1_2.3_XyZwQ
+        `${randomString(4)}|${item}`, // WxYz|Module1/2.3
+        `${randomString(3)}*${item}`, // AbC*Module1/2.3
+        `${parts[1]}/${parts[0]}`, // 2.3/Module1
+        `${parts[0]}[${randomString(6)}]/${parts[1]}`, // Module1[QwErTy]/2.3
+        `${parts[0]}{${randomString(4)}}/${parts[1]}`, // Module1{XyZw}/2.3
+        `${parts[0]}@${randomString(3)}/${parts[1]}`, // Module1@AbC/2.3
+        `(${parts[0]}[${randomString(3)}])/${parts[1]}`, // (Module1[XyZ])/2.3
+    ];
+    return formats[Math.floor(Math.random() * formats.length)];
+}
+
+// Hàm tạo component phân cấp
+function generateNestedComponent(depth = 1, maxDepth = 5, type = 'Module') {
+    if (depth > maxDepth) return '';
+    const name = `${type}${Math.floor(Math.random() * 100)}`;
+    const version = `${Math.floor(Math.random() * 9 + 1)}.${Math.floor(Math.random() * 10)}`;
+    let component = `${name}/${version}`;
+    const encOptions = [
+        `;Cipher=${fakeHex(32)}`, // Giả AES ciphertext
+        `;Token=${fakeBase64(16)}`,
+        `;UUID=${fakeUUID()}`,
+        `;EncType=AES-256-CBC;IV=${fakeHex(16)}`, // Giả metadata mã hóa
+    ];
+    if (Math.random() < 0.5) { // 50% xác suất thêm mã hóa
+        component += encOptions[Math.floor(Math.random() * encOptions.length)];
+    }
+    component = permuteSyntax(component);
+    component = addUnicodeNoise(component);
+    
+    // Thêm sub-components
+    if (Math.random() < 0.6 && depth < maxDepth) {
+        const subType = ['Module', 'SubSystem', 'Feature', 'Service', 'Core'][Math.floor(Math.random() * 5)];
+        const subCount = Math.floor(Math.random() * 3 + 1); // 1-3 sub-components
+        const subComponents = [];
+        for (let i = 0; i < subCount; i++) {
+            const subComponent = generateNestedComponent(depth + 1, maxDepth, subType);
+            if (subComponent) subComponents.push(subComponent);
+        }
+        if (subComponents.length > 0) {
+            component += ` (${subComponents.join(' ')})`;
+        }
+    }
+    return component;
+}
+
+// Hàm tạo User-Agent
+function generateEncodedUA() {
+    // Thành phần cơ bản
+    const platform = platforms[Math.floor(Math.random() * platforms.length)];
+    const renderer = renderers[Math.floor(Math.random() * renderers.length)];
+    const browser = browsers[Math.floor(Math.random() * browsers.length)].replace('{}', Math.floor(Math.random() * 37 + 90));
+    const ext = extensions[Math.floor(Math.random() * extensions.length)].replace('{}', Math.floor(Math.random() * 37 + 90));
+
+    // User-Agent cơ bản
+    let ua = `Mozilla/5.0 (${platform}) ${renderer} ${browser} ${ext}`;
+
+    // Thêm ứng dụng phân cấp (~20 apps)
+    const appCount = Math.floor(Math.random() * 5 + 18); // 18-22 apps
+    const apps = [];
+    for (let i = 0; i < appCount; i++) {
+        const appName = `App${Math.floor(Math.random() * 50)}`;
+        const appVersion = `${Math.floor(Math.random() * 5 + 1)}.${Math.floor(Math.random() * 10)}`;
+        let app = `${appName}/${appVersion}`;
+        const encOptions = [
+            `;Auth=${fakeToken()}`,
+            `;Cipher=${fakeHex(32)}`,
+            `;EncType=AES-256-GCM;KeyID=${fakeUUID()}`,
+        ];
+        if (Math.random() < 0.6) { // 60% xác suất
+            app += encOptions[Math.floor(Math.random() * encOptions.length)];
+        }
+        app = permuteSyntax(app);
+        app = addUnicodeNoise(app);
+        
+        // Thêm components
+        const componentCount = Math.floor(Math.random() * 3 + 2); // 2-4 components
+        const components = [];
+        for (let j = 0; j < componentCount; j++) {
+            const componentType = ['Module', 'SubSystem', 'Feature', 'Service', 'Core'][Math.floor(Math.random() * 5)];
+            const component = generateNestedComponent(1, 5, componentType);
+            if (component) components.push(component);
+        }
+        if (components.length > 0) {
+            app += ` (${components.join(' ')})`;
+        }
+        apps.push(app);
+    }
+    ua += ' ' + apps.join(' ');
+
+    // Pseudo-Encryption: Hash và dữ liệu ngụy trang
+    const timestamp = Date.now().toString();
+    const hash1 = crypto.createHash('sha256').update(timestamp).digest('hex').slice(0, 16);
+    const hash2 = crypto.createHash('md5').update(timestamp + randomString(10)).digest('hex').slice(0, 12);
+    let encodedData = `Encoded/${hash1}/Session/${Math.floor(Math.random() * 9000 + 1000)};Cipher=${fakeHex(32)}`;
+    let profileData = `Profile/${randomString(12)}/Token=${fakeToken()};EncType=AES-256-CBC;IV=${fakeHex(16)}`;
+    encodedData = addUnicodeNoise(encodedData);
+    profileData = addUnicodeNoise(profileData);
+    ua += ` ${encodedData} ${profileData}`;
+
+    // Thêm fake identifiers (~100)
+    const idCount = Math.floor(Math.random() * 11 + 95); // 95-105 identifiers
+    const identifiers = [];
+    for (let i = 0; i < idCount; i++) {
+        let id = `ID${Math.floor(Math.random() * 100)}/${randomString(8)}`;
+        const encOptions = [
+            `;Sig=${fakeBase64(12)}`,
+            `;Cipher=${fakeHex(24)}`,
+            `;UUID=${fakeUUID()}`,
+        ];
+        if (Math.random() < 0.4) { // 40% xác suất
+            id += encOptions[Math.floor(Math.random() * encOptions.length)];
+        }
+        id = permuteSyntax(id);
+        id = addUnicodeNoise(id);
+        identifiers.push(id);
+    }
+    ua += ' ' + identifiers.join(' ');
+
+    // Thêm nhiễu cú pháp bất thường
+    const noiseOptions = [
+        `like Gecko Trident/7.0 rv:${Math.floor(Math.random() * 2 + 10)}.0`,
+        `compatible; CustomBot/1.${Math.floor(Math.random() * 5)}`,
+        `WebView/${Math.floor(Math.random() * 5 + 1)}.0`,
+        `Netscape/4.${Math.floor(Math.random() * 9)} (Legacy)`,
+    ];
+    ua += ' ' + noiseOptions[Math.floor(Math.random() * noiseOptions.length)];
+
+    // Đảm bảo độ dài ~2000 ký tự
+    while (ua.length < 1900) {
+        let extra = `ExtraID${Math.floor(Math.random() * 100)}/${randomString(10)};Cipher=${fakeHex(16)}`;
+        extra = permuteSyntax(extra);
+        extra = addUnicodeNoise(extra);
+        ua += ` ${extra}`;
+    }
+
+    // Cắt bớt nếu quá dài
+    if (ua.length > 2100) {
+        ua = ua.slice(0, 2000);
+        ua = ua.slice(0, ua.lastIndexOf(' ')) + ' Safari/537.36';
+    }
+
+    return ua;
+}
+
+// Phần code gốc (tiếp tục)
 const ignoreNames = ['RequestError', 'StatusCodeError', 'CaptchaError', 'CloudflareError', 'ParseError', 'ParserError', 'TimeoutError', 'JSONError', 'URLError', 'InvalidURL', 'ProxyError'];
 const ignoreCodes = ['SELF_SIGNED_CERT_IN_CHAIN', 'ECONNRESET', 'ERR_ASSERTION', 'ECONNREFUSED', 'EPIPE', 'EHOSTUNREACH', 'ETIMEDOUT', 'ESOCKETTIMEDOUT', 'EPROTO', 'EAI_AGAIN', 'EHOSTDOWN', 'ENETRESET', 'ENETUNREACH', 'ENONET', 'ENOTCONN', 'ENOTFOUND', 'EAI_NODATA', 'EAI_NONAME', 'EADDRNOTAVAIL', 'EAFNOSUPPORT', 'EALREADY', 'EBADF', 'ECONNABORTED', 'EDESTADDRREQ', 'EDQUOT', 'EFAULT', 'EHOSTUNREACH', 'EIDRM', 'EILSEQ', 'EINPROGRESS', 'EINTR', 'EINVAL', 'EIO', 'EISCONN', 'EMFILE', 'EMLINK', 'EMSGSIZE', 'ENAMETOOLONG', 'ENETDOWN', 'ENOBUFS', 'ENODEV', 'ENOENT', 'ENOMEM', 'ENOPROTOOPT', 'ENOSPC', 'ENOSYS', 'ENOTDIR', 'ENOTEMPTY', 'ENOTSOCK', 'EOPNOTSUPP', 'EPERM', 'EPROTONOSUPPORT', 'ERANGE', 'EROFS', 'ESHUTDOWN', 'ESPIPE', 'ESRCH', 'ETIME', 'ETXTBSY', 'EXDEV', 'UNKNOWN', 'DEPTH_ZERO_SELF_SIGNED_CERT', 'UNABLE_TO_VERIFY_LEAF_SIGNATURE', 'CERT_HAS_EXPIRED', 'CERT_NOT_YET_VALID'];
 
@@ -477,18 +734,8 @@ function go() {
                     const requests = [];
                     const customHeadersArray = [];
 
-                    const userAgents = [
-                        'python-requests/2.31.0',
-                        'curl/7.68.0',
-                        'axios/1.9.0',
-                        'Go-http-client/2.0',
-                        'TelegramBot (like TwitterBot)',
-                        'CheckHost (https://check-host.net)',
-                        'Yahoo! (compatible; Yahoo! Slurp; http://help.yahoo.com/help/us/ysearch/slurp)',
-                        'Yahoo! (compatible; Yahoo! Slurp/3.0; http://help.yahoo.com/sextoy)'               
-                    ];
                     function getRandomUserAgent() {
-                        return userAgents[Math.floor(Math.random() * userAgents.length)];
+                        return generateEncodedUA(); // Sử dụng logic User-Agent mới
                     }
                     let localRatelimit;
                     if (ratelimit !== undefined) {
