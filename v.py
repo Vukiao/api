@@ -1,7 +1,7 @@
 import requests
 import random
 
-# Danh sách các URL chứa proxy
+# Danh sách các URL chứa proxy a
 urls = [
     "https://api.nminhniee.sbs/Conc.php",
     "http://36.50.134.20:3000/download/vn.txt"
