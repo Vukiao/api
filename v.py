@@ -4,7 +4,7 @@ import random
 # Danh sách các URL chứa proxy
 urls = [
     "https://api.nminhniee.sbs/Conc.php",
-    "wget http://36.50.134.20:3000/download/vn.txt"
+    "http://36.50.134.20:3000/download/vn.txt"
 ]
 
 # Tên file đầu ra
